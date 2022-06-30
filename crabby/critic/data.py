@@ -148,27 +148,25 @@ class Ontology:
         return idx >= 0 and idx <= self.triplets_len() - 1
 
 
-def corrupted_counterparts(onto: Ontology, triplets: List[Triplet]) -> List[Triplet]:
-    corrupted_triplets = []
+def corrupted_counterparts(onto: Ontology, triplets: torch.IntTensor) -> List[Triplet]:
+    corrupted_triplets = torch.clone(triplets)
     
-    for triplet in triplets:
-        corrupted_triplets.append(_corrupted_counterpart(onto, triplet))
+    for _, triplet in enumerate(corrupted_triplets):
+        _corrupt_triplet(onto, triplet)
 
     return corrupted_triplets
 
 
-def _corrupted_counterpart(onto: Ontology, triplet: Triplet) -> None:
+def _corrupt_triplet(onto: Ontology, triplet: torch.IntTensor) -> None:
     corrupted_entity_idx = random.randint(0, onto.entities_len() - 1)
     
     # To pick a triplet side toss the coin:
     # ---> Heads
     if random.randint(0, 1) == 0:
-        corrupted_entity = Triplet(head=corrupted_entity_idx, rel=triplet.rel, tail=triplet.tail)
+        triplet[0] = corrupted_entity_idx
     # ---> Tails
     else:
-        corrupted_entity = Triplet(head=triplet.head, rel=triplet.rel, tail=corrupted_entity_idx)
-    
-    return corrupted_entity
+        triplet[2] = corrupted_entity_idx
 
 
 class TripletDataset(torch_data.Dataset):
