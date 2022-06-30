@@ -1,4 +1,5 @@
-from typing import List, NamedTuple, Tuple
+import random
+from typing import List, NamedTuple
 
 import torch.utils.data as torch_data
 
@@ -90,6 +91,9 @@ class Ontology:
         
         return Triplet(head=entity_idx, rel=trans.rel, tail=trans.tail)
 
+    def entities_len(self) -> int:
+        return len(self._entities)
+
     def _entity_exists(self, entity: int) -> bool:
         return entity >= 0 and entity <= len(self._entities) - 1
 
@@ -134,6 +138,29 @@ class Ontology:
         # left can never become greater than right and we have a sparse representation where
         # an idx of a triplet would most probably not be found in an array but is a valid idx.
         return left
+
+
+def corrupted_counterparts(onto: Ontology, triplets: List[Triplet]) -> List[Triplet]:
+    corrupted_triplets = []
+    
+    for triplet in triplets:
+        corrupted_triplets.append(_corrupted_counterpart(onto, triplet))
+
+    return corrupted_triplets
+
+
+def _corrupted_counterpart(onto: Ontology, triplet: Triplet) -> None:
+    corrupted_entity_idx = random.randint(0, onto.entities_len() - 1)
+    
+    # To pick a triplet side toss the coin:
+    # ---> Heads
+    if random.randint(0, 1) == 0:
+        corrupted_entity = Triplet(head=corrupted_entity_idx, rel=triplet.rel, tail=triplet.tail)
+    # ---> Tails
+    else:
+        corrupted_entity = Triplet(head=triplet.head, rel=triplet.rel, tail=corrupted_entity_idx)
+    
+    return corrupted_entity
 
 
 class TripletDataset(torch_data.Dataset):
