@@ -1,6 +1,7 @@
 import random
 from typing import List, NamedTuple
 
+import torch
 import torch.utils.data as torch_data
 
 
@@ -176,4 +177,6 @@ class TripletDataset(torch_data.Dataset):
         return self._onto.triplets_len()
 
     def __getitem__(self, idx):
-        return self._onto.get_triplet(idx)
+        triplet = self._onto.get_triplet(idx)
+        
+        return torch.tensor([triplet.head, triplet.rel, triplet.tail])
