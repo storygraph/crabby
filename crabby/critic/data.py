@@ -61,6 +61,7 @@ class Ontology:
 
         return False
 
+    # TODO: Remove as it should be a deadcode.
     # Adding all triplets at once is faster because on each add we need
     # to update the total triplet counts for correct faster searching.
     def add_triplets(self, triplets: List[Triplet]) -> None:
@@ -94,6 +95,9 @@ class Ontology:
 
     def entities_len(self) -> int:
         return len(self._entities)
+
+    def relations_len(self) -> int:
+        return len(self._relations)
 
     def _validate_adj_list(self) -> None:
         if len(self._adj_list) != len(self._entities):
