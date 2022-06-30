@@ -81,24 +81,18 @@ class Ontology:
     def triplets_len(self) -> int:
         return self._triplet_counts[len(self._triplet_counts) - 1]
 
-    def get_triplet(self, entity_idx: int) -> Triplet:
-        head = self._head_for_triplet_at(entity_idx)
+    def get_triplet(self, triplet_idx: int) -> Triplet:
+        head = self._head_for_triplet_at(triplet_idx)
 
         neigbours = self._adj_list[head]
-        trans_idx = entity_idx - (self._triplet_counts[head] - len(neigbours))
+        trans_idx = triplet_idx - (self._triplet_counts[head] - len(neigbours))
 
         trans = neigbours[trans_idx]
         
-        return Triplet(head=entity_idx, rel=trans.rel, tail=trans.tail)
+        return Triplet(head=head, rel=trans.rel, tail=trans.tail)
 
     def entities_len(self) -> int:
         return len(self._entities)
-
-    def _entity_exists(self, entity: int) -> bool:
-        return entity >= 0 and entity <= len(self._entities) - 1
-
-    def _rel_exists(self, rel: int) -> bool:
-        return rel >= 0 and rel <= len(self._relations) - 1
 
     def _validate_adj_list(self) -> None:
         if len(self._adj_list) != len(self._entities):
@@ -118,8 +112,8 @@ class Ontology:
         left = 0
         right = len(self._triplet_counts) - 1
         
-        if not self._entity_exists(idx):
-            raise TripletOutOfBoundsError(f"Expected triplet idx {idx} to be between 0 and {self._triplet_counts[right] - 1} inclusively.")
+        if not self._triplet_exists(idx):
+            raise TripletOutOfBoundsError(f"Expected triplet idx {idx} to be between 0 and {self.triplets_len() - 1} inclusively.")
         
         # Done because every item of _triplet_counts contains the number of
         # triplets for the given head.
@@ -138,6 +132,15 @@ class Ontology:
         # left can never become greater than right and we have a sparse representation where
         # an idx of a triplet would most probably not be found in an array but is a valid idx.
         return left
+
+    def _entity_exists(self, entity: int) -> bool:
+        return entity >= 0 and entity <= len(self._entities) - 1
+
+    def _rel_exists(self, rel: int) -> bool:
+        return rel >= 0 and rel <= len(self._relations) - 1
+    
+    def _triplet_exists(self, idx: int) -> bool:
+        return idx >= 0 and idx <= self.triplets_len() - 1
 
 
 def corrupted_counterparts(onto: Ontology, triplets: List[Triplet]) -> List[Triplet]:
@@ -164,4 +167,13 @@ def _corrupted_counterpart(onto: Ontology, triplet: Triplet) -> None:
 
 
 class TripletDataset(torch_data.Dataset):
-    pass
+    _onto: Ontology
+
+    def __init__(self, onto: Ontology) -> None:
+        self._onto = onto
+
+    def __len__(self) -> int:
+        return self._onto.triplets_len()
+
+    def __getitem__(self, idx):
+        return self._onto.get_triplet(idx)
