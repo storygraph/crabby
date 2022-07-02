@@ -1,3 +1,4 @@
+import math
 import os
 import re
 from typing import List, Tuple, Pattern
@@ -33,7 +34,12 @@ class SemvalDatasetLoader:
         # Just taking the unique ones
         relations = list(set(labels))
         
-        return data.SentencePairer(sentences, labels, relations)
+        split_idx = math.ceil(len(sentences) * 0.9)
+        
+        training_pairer = data.SentencePairer(sentences[:split_idx], labels[:split_idx], relations)
+        test_pairer = data.SentencePairer(sentences[split_idx:], labels[split_idx:], relations)
+        
+        return training_pairer, test_pairer
 
     def _split_into_groups(self, lines: List[str]) -> List[List[str]]:
         groups = [None] * (len(lines) // 4)
@@ -61,5 +67,3 @@ class SemvalDatasetLoader:
         sent = re.findall(self._raw_sent_line_pattern, raw_sent)[0]
         
         return sent, group[1]
-        
-    
