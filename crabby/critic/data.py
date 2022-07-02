@@ -174,6 +174,7 @@ class TripletDataset(torch_data.Dataset):
     _onto: Ontology
 
     def __init__(self, onto: Ontology) -> None:
+        super().__init__()
         self._onto = onto
 
     def __len__(self) -> int:
