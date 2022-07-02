@@ -62,8 +62,6 @@ def main():
     calc = critic.Calculator(dataset, onto)
     
     metrics_bundle = calc.calculate(model)
-    print(f"Hits at 10 ---> {metrics_bundle.hits_at_10}")
-    print(f"Mean rank ---> {metrics_bundle.mean_rank}")
     
     for _ in range(100):
         trainer.train_one_epoch()
