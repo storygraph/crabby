@@ -2,19 +2,22 @@ from crabby.entity.data_preparation import Corpus
 from sklearn_crfsuite import CRF
 from sklearn_crfsuite import metrics
 import pickle
+import nltk
 import os
 
+nltk.download('punkt')
+nltk.download('averaged_perceptron_tagger')
+
+
 class CRF_Model():
-    def __init__(self, shouldTrain=True):
+    def __init__(self, shouldTrain=False):
         if shouldTrain:
             self._train_model_from_scratch()
         else:
             self._load_model()
 
-
     def _load_model(self):
         self.crf = pickle.load(open(os.getcwd() + "/crabby/entity/model/crf", 'rb'))
-
 
     def _train_model_from_scratch(self):
         corpus = Corpus()
@@ -29,11 +32,13 @@ class CRF_Model():
         self.train()
         self.evaluate()
 
+    def predict(self, document):
+        sentences = pos_tags(document)
 
-    def predict(self, sentence):
-        features = CRF_Model.sent2features(sentence)
-        return self.crf.predict([features])
+        features = [CRF_Model.sent2features(s) for s in sentences]
+        prediction = self.crf.predict(features)
 
+        return format(sentences, prediction)
 
     def train(self):
         X_train = [CRF_Model.sent2features(s) for s in self.training]
@@ -53,10 +58,8 @@ class CRF_Model():
                                       average='weighted', labels=labels)
         print(score)
 
-
     def save_model(self):
         pickle.dump(self.crf, open(os.getcwd() + "/crabby/entity/model/crf", 'wb'))
-
 
     @staticmethod
     def word2features(sent, i):
@@ -99,7 +102,6 @@ class CRF_Model():
             features['EOS'] = True
         return features
 
-
     @staticmethod
     def sent2features(sent):
         return [CRF_Model.word2features(sent, i) for i in range(len(sent))]
@@ -107,3 +109,47 @@ class CRF_Model():
     @staticmethod
     def sent2labels(sent):
         return [label for _, _, label in sent]
+
+
+def pos_tags(document):
+    sentences = nltk.sent_tokenize(document)
+    sentences = [nltk.word_tokenize(sent) for sent in sentences]
+    sentences = [nltk.pos_tag(sent) for sent in sentences]
+    return sentences
+
+
+def format(sentences, tags):
+    result = []
+    for index in range(len(sentences)):
+        sentence = format_sentence(sentences[index], tags[index])
+        result.append(sentence)
+
+    return ' '.join(result)
+
+
+def format_sentence(sentence, tags):
+    number_of_entities = 0
+    entity = []
+    result = []
+
+    for index in range(len(sentence)):
+        if tags[index] == 'O':
+            if len(entity):
+                number_of_entities = number_of_entities + 1
+                e = ' '.join(entity)
+                result.append("<e{}> {} </e{}>".format(number_of_entities, e, number_of_entities))
+                entity = []
+            
+            result.append(sentence[index][0])
+        elif tags[index][0] == 'B':
+            if len(entity):
+                number_of_entities = number_of_entities + 1
+                e = ' '.join(entity)
+                result.append("<e{}> {} </e{}>".format(number_of_entities, e, number_of_entities))
+                entity = []
+
+            entity.append(sentence[index][0])
+        else:
+            entity.append(sentence[index][0])
+
+    return ' '.join(result)

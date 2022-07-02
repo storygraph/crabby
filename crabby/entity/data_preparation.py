@@ -4,6 +4,11 @@ import os
 import pandas as pd
 import random
 
+import nltk
+
+nltk.download('punkt')
+nltk.download('averaged_perceptron_tagger')
+
 class Corpus:
     def __init__(self, file='/crabby/entity/data/ner_dataset.csv'):
         self.training = None
