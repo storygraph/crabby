@@ -2,6 +2,7 @@ import math
 from typing import Tuple
 
 import torch
+import torch.utils.data as torch_data
 
 import crabby.critic.data as data
 
@@ -38,3 +39,59 @@ class TranseModel(torch.nn.Module):
 
     def _initial_boundaries(self, k: int) -> Tuple[float, float]:
         return -6.0 / math.sqrt(k), 6.0 / math.sqrt(k)
+
+
+class Trainer:
+    _training_loader: torch_data.DataLoader
+    _onto: data.Ontology
+    _optimizer: torch.optim.Optimizer
+    _model: TranseModel
+    _margin: float
+    _epoch: int
+
+    def __init__(
+        self, 
+        training_loader: torch_data.DataLoader,
+        onto: data.Ontology,
+        optimizer: torch.optim.Optimizer,
+        model: TranseModel,
+        margin: float,
+    ) -> None:
+        self._training_loader = training_loader
+        self._onto = onto
+        self._optimizer = optimizer
+        self._model = model
+        self._margin = margin
+
+        self._epoch = 0
+
+    def train_one_epoch(self) -> None:
+        self._epoch += 1
+        minibatch_count = 0
+        cum_loss = 0
+
+        # Sample a minibatch of triplets on each turn.
+        for _, triplets in enumerate(self._training_loader):
+            self._optimizer.zero_grad()
+            
+            corrupted_triplets = data.corrupted_counterparts(self._onto, triplets)
+            
+            out = self._model(triplets)
+            corrupted_out = self._model(corrupted_triplets)
+            
+            loss = torch.nn.functional.relu(self._margin + out - corrupted_out).sum()
+            loss.backward()
+            
+            # Adjust learning weights
+            self._optimizer.step()
+
+            cum_loss += loss / len(triplets)
+            minibatch_count += 1
+        
+        print(f"[Epoch {self._epoch}] Average loss ---> {cum_loss / minibatch_count}")
+
+    def epoch(self) -> int:
+        return self._epoch
+
+    def model(self) -> TranseModel:
+        return self._model

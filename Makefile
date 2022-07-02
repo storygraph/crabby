@@ -14,6 +14,7 @@ test-unit:
 .PHONY: setup
 setup:
 	$(call pip install -r requirements.txt)
+
 .PHONY: fetch-lang-mdl
 fetch-lang-mdl:
 	@./scripts/fetch_lang_model.sh
