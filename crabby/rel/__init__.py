@@ -1,4 +1,5 @@
 from crabby.rel.data import (
-    EntityPairSentenceSet,
+    SentencePairer,
     PairOutOfBoundsError,
+    LabelError,
 ) # noqa
