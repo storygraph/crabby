@@ -13,6 +13,11 @@ python3 -m venv .venv
 
 # Install the requirements like so.
 (source .venv/bin/activate && pip install -r requirements.txt)
+make fetch-lang-mdl
+
+# To test relation extraction run.
+# It is being thaught over the dataset from semval2010-task8.
+make test-relex
 
 # To test transe run.
 make test-transe

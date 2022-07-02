@@ -4,3 +4,4 @@ from crabby.rel.data import (
     LabelError,
     SentenceDataset,
 ) # noqa
+from crabby.rel.loader import SemvalDatasetLoader # noqa
