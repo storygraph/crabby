@@ -1,7 +1,9 @@
+import os
 from typing import List
 import unittest
 
 import torch
+import compress_fasttext.models as ft
 
 import crabby.rel as crabby_rel
 from crabby.rel.data import LabelError
@@ -50,27 +52,27 @@ class TestSentencePairer(unittest.TestCase):
     def test_getitem(self) -> None:
         sentences = crabby_rel.SentencePairer([self._zero_ent_sent, self._one_ent_sent, self._two_ent_sent])
 
-        self.assertEqual(sentences[0], "<e1>John</e1> is a father of <e2>Gordon</e2>.")
+        self.assertEqual(sentences[0], "< 1 > John < / 1 > is a father of < 2 > Gordon < / 2 >.")
 
     def test_getitem_filters_entity_markers(self) -> None:
         sentences = crabby_rel.SentencePairer([self._zero_ent_sent, self._two_ent_sent, self._one_ent_sent ,self._four_ent_sent])
         
         self.assertEqual(len(sentences), 7)
         
-        self.assertEqual(sentences[0], "<e1>John</e1> is a father of <e2>Gordon</e2>.")
-        
-        self.assertEqual(sentences[1], "<e1>Oliver</e1> kissed <e2>Sally</e2> for Christmas eve in front of father Heuston.")
-        self.assertEqual(sentences[2], "<e1>Oliver</e1> kissed Sally for <e2>Christmas eve</e2> in front of father Heuston.")
-        self.assertEqual(sentences[3], "<e1>Oliver</e1> kissed Sally for Christmas eve in front of father <e2>Heuston</e2>.")
-        self.assertEqual(sentences[4], "Oliver kissed <e1>Sally</e1> for <e2>Christmas eve</e2> in front of father Heuston.")
-        self.assertEqual(sentences[5], "Oliver kissed <e1>Sally</e1> for Christmas eve in front of father <e2>Heuston</e2>.")
-        self.assertEqual(sentences[6], "Oliver kissed Sally for <e1>Christmas eve</e1> in front of father <e2>Heuston</e2>.")
+        self.assertEqual(sentences[0], "< 1 > John < / 1 > is a father of < 2 > Gordon < / 2 >.")
+
+        self.assertEqual(sentences[1], "< 1 > Oliver < / 1 > kissed < 2 > Sally < / 2 > for Christmas eve in front of father Heuston.")
+        self.assertEqual(sentences[2], "< 1 > Oliver < / 1 > kissed Sally for < 2 > Christmas eve < / 2 > in front of father Heuston.")
+        self.assertEqual(sentences[3], "< 1 > Oliver < / 1 > kissed Sally for Christmas eve in front of father < 2 > Heuston < / 2 >.")
+        self.assertEqual(sentences[4], "Oliver kissed < 1 > Sally < / 1 > for < 2 > Christmas eve < / 2 > in front of father Heuston.")
+        self.assertEqual(sentences[5], "Oliver kissed < 1 > Sally < / 1 > for Christmas eve in front of father < 2 > Heuston < / 2 >.")
+        self.assertEqual(sentences[6], "Oliver kissed Sally for < 1 > Christmas eve < / 1 > in front of father < 2 > Heuston < / 2 >.")
 
     def test_getitem_filters_reversed_entity_markers(self) -> None:
         sentences = crabby_rel.SentencePairer([self._rev_two_ent_sent])
         
         self.assertEqual(len(sentences), 1)
-        self.assertEqual(sentences[0], "<e2>John</e2> is a father of <e1>Gordon</e1>.")
+        self.assertEqual(sentences[0], "< 2 > John < / 2 > is a father of < 1 > Gordon < / 1 >.")
 
     def test_labels_count_validation(self) -> None:
         with self.assertRaises(LabelError):
@@ -95,13 +97,14 @@ class TestSentencePairer(unittest.TestCase):
             relations=["love", "dislike", "none"],
         )
         
-        self.assertEqual(sentences[0], ("<e1>Minnie</e1> loves <e2>Mickey</e2> but dislikes Alberto!", "love"))
-        self.assertEqual(sentences[1], ("<e1>Minnie</e1> loves Mickey but dislikes <e2>Alberto</e2>!", "dislike"))
-        self.assertEqual(sentences[2], ("Minnie loves <e1>Mickey</e1> but dislikes <e2>Alberto</e2>!", "none"))
+        self.assertEqual(sentences[0], ("< 1 > Minnie < / 1 > loves < 2 > Mickey < / 2 > but dislikes Alberto!", "love"))
+        self.assertEqual(sentences[1], ("< 1 > Minnie < / 1 > loves Mickey but dislikes < 2 > Alberto < / 2 >!", "dislike"))
+        self.assertEqual(sentences[2], ("Minnie loves < 1 > Mickey < / 1 > but dislikes < 2 > Alberto < / 2 >!", "none"))
 
 
 class TestSentenceDataset(unittest.TestCase):
     _pairer: crabby_rel.SentencePairer
+    _ft_model: ft.CompressedFastTextKeyedVectors
     
     def setUp(self) -> None:
         three_ent_sent = "<e1>Minnie</e1> loves <e2>Mickey</e2> but dislikes <e3>Alberto</e3>!"
@@ -112,16 +115,19 @@ class TestSentenceDataset(unittest.TestCase):
             relations=["love", "dislike", "none"],
         )
 
+        # TODO: Replace with a mock since this slows down unit-tests and turns them into integration ones.
+        self._ft_model = ft.CompressedFastTextKeyedVectors.load(os.getenv("FT_MDL", ""))
+
     def test_len(self) -> None:
-        dataset = crabby_rel.SentenceDataset(self._pairer)
+        dataset = crabby_rel.SentenceDataset(self._pairer, self._ft_model)
         self.assertEqual(len(dataset), 3)
 
     def test_getitem(self) -> None:
-        dataset = crabby_rel.SentenceDataset(self._pairer)
+        dataset = crabby_rel.SentenceDataset(self._pairer, self._ft_model)
         
         _, label = dataset[0]
         self._assert_tensor_equals(label, [1.0, 0.0, 0.0])
-        
+
         _, label = dataset[1]
         self._assert_tensor_equals(label, [0.0, 1.0, 0.0])
 

@@ -5,6 +5,8 @@ from typing import Dict, List, Pattern, Tuple
 
 import torch
 import torch.utils.data as torch_data
+import compress_fasttext.models as ft
+from nltk.tokenize import word_tokenize
 
 
 class PairOutOfBoundsError(Exception):
@@ -170,13 +172,13 @@ class SentencePairer:
         left_tag = re.findall(self._left_tag_marker_regex, marker_one)[0]
         right_tag = re.findall(self._right_tag_marker_regex, marker_one)[0]
         
-        new_marker_one = marker_one.replace(left_tag, "<e1>").replace(right_tag, "</e1>")
+        new_marker_one = marker_one.replace(left_tag, "< 1 > ").replace(right_tag, " < / 1 >")
         
         # guaranteed to be of len 1.
         left_tag = re.findall(self._left_tag_marker_regex, marker_two)[0]
         right_tag = re.findall(self._right_tag_marker_regex, marker_two)[0]
         
-        new_marker_two = marker_two.replace(left_tag, "<e2>").replace(right_tag, "</e2>")        
+        new_marker_two = marker_two.replace(left_tag, "< 2 > ").replace(right_tag, " < / 2 >")        
 
         return sent.replace(marker_one, new_marker_one).replace(marker_two, new_marker_two)
 
@@ -215,11 +217,13 @@ class SentenceDataset(torch_data.Dataset):
     _labels: List[str]
     # TODO: Think about memory wasting.
     _pairer: SentencePairer
+    _fasttext: ft.CompressedFastTextKeyedVectors
     
-    def __init__(self, pairer: SentencePairer) -> None:
+    def __init__(self, pairer: SentencePairer, fasttext: ft.CompressedFastTextKeyedVectors) -> None:
         super().__init__()
         
         self._pairer = pairer
+        self._fasttext = fasttext
         self._populate_sentences(pairer)
 
     def __len__(self) -> int:
@@ -227,17 +231,31 @@ class SentenceDataset(torch_data.Dataset):
 
     def __getitem__(self, idx):
         if self._pairer.is_training():
-            sent, label = self._sentences[idx]
-            
-            return sent, self._rel_tensor(label)
+            return self._sentences[idx], self._labels[idx]
 
         return self._sentences[idx]
 
     def _populate_sentences(self, pairer: SentencePairer) -> None:
         self._sentences = [None] * len(pairer)
-        
+
+        if self._pairer.is_training():
+            self._labels = [None] * len(pairer)    
+
         for i in range(len(pairer)):
-            self._sentences[i] = pairer[i]
+            if self._pairer.is_training():
+                sent, label = pairer[i]
+                self._labels[i] = self._rel_tensor(label)
+            else:
+                sent = pairer[i]
+            
+            words = word_tokenize(sent)
+            self._sentences[i] = torch.rand(len(words), 300)
+
+            for j, word in enumerate(words):
+                embedding = self._fasttext[word]
+                embedding.setflags(write=True)
+
+                self._sentences[i][j] = torch.from_numpy(embedding)
 
     def _rel_tensor(self, label: str) -> torch.FloatTensor:
         idx = self._pairer.rel_idx(label)

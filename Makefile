@@ -9,9 +9,13 @@ test-unit:
 .PHONY: setup
 setup:
 	$(call pip install -r requirements.txt)
+.PHONY: fetch-lang-mdl
+fetch-lang-mdl:
+	@./scripts/fetch_lang_model.sh
+
 
 # 1 - script path
 define run_in_venv
 	@echo "Running crabby unit tests..."
-	@(export DATA_DIR="${PWD}/data" && . .venv/bin/activate && PYTHONPATH="${PYTHONPATH}:${PWD}" && python3 $(1))
+	@(export DATA_DIR="${PWD}/data" && export FT_MDL="${PWD}/data/ft_cc.en.300_freqprune_100K_20K_pq_100.bin" && . .venv/bin/activate && PYTHONPATH="${PYTHONPATH}:${PWD}" && python3 $(1))
 endef
