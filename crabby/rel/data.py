@@ -1,8 +1,9 @@
 import itertools
 import math
 import re
-from typing import List, Pattern, Tuple
+from typing import Dict, List, Pattern, Tuple
 
+import torch
 import torch.utils.data as torch_data
 
 
@@ -29,6 +30,9 @@ class SentencePairer:
     # There should be a label for each pair.
     # Labels are only provided in training mode.
     _labels: List[str]
+    # _relations hold the class names of all relations.
+    _relations: List[str]
+    _rel_to_idx: Dict[str, int]
     # _cum_pairs_per_sent is cumulative.
     _cum_pairs_per_sent: List[int]
     _marker_regex: Pattern
@@ -36,9 +40,10 @@ class SentencePairer:
     _left_tag_marker_regex: Pattern
     _right_tag_marker_regex: Pattern
 
-    def __init__(self, sentences: List[str], labels: List[str] = None) -> None:
+    def __init__(self, sentences: List[str], labels: List[str] = None, relations: List[str] = None) -> None:
         self._sentences = sentences
         self._labels = labels
+        self._relations = relations
 
         self._marker_regex = re.compile(self._MARKER_REGEX)
         self._filter_marker_regex = re.compile(self._FILTER_MARKER_REGEX)
@@ -46,7 +51,11 @@ class SentencePairer:
         self._right_tag_marker_regex = re.compile(self._RIGHT_TAG_MARKER_REGEX)
 
         self._cum_pairs_per_sent = self._get_pairs_per_sent()
+
         self._validate_label_count()
+        self._validate_relations()
+
+        self._rel_to_idx = self._get_rel_to_idx()
 
     def __len__(self) -> int:
         if len(self._cum_pairs_per_sent) == 0:
@@ -64,11 +73,20 @@ class SentencePairer:
 
         exc_indices = self._pair_ids_for_comb_idx(sent_idx, pair_idx)
         
-        if self._labels is not None:
+        if self.is_training():
             return self._filter_markers(sent_idx, exc_indices), self._labels[idx]
 
         return self._filter_markers(sent_idx, exc_indices)
-    
+
+    def is_training(self) -> bool:
+        return self._labels is not None
+
+    def rel_count(self) -> int:
+        return len(self._relations)
+
+    def rel_idx(self, rel: str) -> int:
+        return self._rel_to_idx[rel]
+
     def _get_pairs_per_sent(self) -> List[int]:
         total_pairs = 0
         cum_pairs_per_sent = []
@@ -163,16 +181,67 @@ class SentencePairer:
         return sent.replace(marker_one, new_marker_one).replace(marker_two, new_marker_two)
 
     def _validate_label_count(self) -> str:
-        if self._labels is not None and len(self._labels) != len(self):
+        if self.is_training() and len(self._labels) != len(self):
             raise LabelError(f"expected labels to be {len(self)} but were {len(self._labels)}")
+
+    def _validate_relations(self) -> str:
+        if self._labels is not None and self._relations is None:
+            raise LabelError("missing relations but given labels")
+
+        if self._relations is not None and self._labels is None:
+            raise LabelError("missing labels but given relations")
+
+        if not (self._relations is not None and self._labels is not None):
+            return
+
+        for label in self._labels:
+            if label not in self._relations:
+                raise LabelError(f"undefined label {label}")
+
+    def _get_rel_to_idx(self) -> Dict[str, int]:
+        if self._relations is None:
+            return None
+
+        rel_to_idx = dict()
+        
+        for i, rel in enumerate(self._relations):
+            rel_to_idx[rel] = i
+        
+        return rel_to_idx
 
 
 class SentenceDataset(torch_data.Dataset):
-    def __init__(self) -> None:
+    _sentences: List[str]
+    _labels: List[str]
+    # TODO: Think about memory wasting.
+    _pairer: SentencePairer
+    
+    def __init__(self, pairer: SentencePairer) -> None:
         super().__init__()
+        
+        self._pairer = pairer
+        self._populate_sentences(pairer)
 
     def __len__(self) -> int:
-        return 0
+        return len(self._sentences)
 
     def __getitem__(self, idx):
-        return None
+        if self._pairer.is_training():
+            sent, label = self._sentences[idx]
+            
+            return sent, self._rel_tensor(label)
+
+        return self._sentences[idx]
+
+    def _populate_sentences(self, pairer: SentencePairer) -> None:
+        self._sentences = [None] * len(pairer)
+        
+        for i in range(len(pairer)):
+            self._sentences[i] = pairer[i]
+
+    def _rel_tensor(self, label: str) -> torch.FloatTensor:
+        idx = self._pairer.rel_idx(label)
+        t = torch.zeros(self._pairer.rel_count())
+        t[idx] = 1.0
+        
+        return t
