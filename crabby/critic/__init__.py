@@ -6,3 +6,5 @@ from crabby.critic.data import (
     corrupted_counterparts,
     TripletDataset,
 ) # noqa
+from crabby.critic.transe import TranseModel, Trainer # noqa
+from crabby.critic.metric import Calculator, MetricsBundle # noqa
