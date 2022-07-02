@@ -33,6 +33,11 @@ class TestOntology(unittest.TestCase):
         
         self.assertEqual(onto.entities_len(), 2)
 
+    def test_relations_len(self) -> None:
+        onto = critic.Ontology(self._adj_list, self._rels, self._entities)
+        
+        self.assertEqual(onto.relations_len(), 2)
+
     def test_triplets_len(self) -> None:
         onto = critic.Ontology(self._adj_list, self._rels, self._entities)
         

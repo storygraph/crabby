@@ -61,6 +61,7 @@ class Ontology:
 
         return False
 
+    # TODO: Remove as it should be a deadcode.
     # Adding all triplets at once is faster because on each add we need
     # to update the total triplet counts for correct faster searching.
     def add_triplets(self, triplets: List[Triplet]) -> None:
@@ -95,6 +96,9 @@ class Ontology:
     def entities_len(self) -> int:
         return len(self._entities)
 
+    def relations_len(self) -> int:
+        return len(self._relations)
+
     def _validate_adj_list(self) -> None:
         if len(self._adj_list) != len(self._entities):
             raise Exception(f"adj list length expected to be {len(self._entities)}, but was {len(self._adj_list)}")
@@ -123,7 +127,8 @@ class Ontology:
         while left < right:
             mid = left + (right - left) // 2
 
-            if self._triplet_counts[mid] == idx:
+            # TODO: Fix this ugly bugger.
+            if self._triplet_counts[mid] == idx and mid > 0 and self._triplet_counts[mid -1] < idx:
                 return mid
             elif self._triplet_counts[mid] < idx:
                 left = mid + 1
@@ -144,27 +149,25 @@ class Ontology:
         return idx >= 0 and idx <= self.triplets_len() - 1
 
 
-def corrupted_counterparts(onto: Ontology, triplets: List[Triplet]) -> List[Triplet]:
-    corrupted_triplets = []
-    
-    for triplet in triplets:
-        corrupted_triplets.append(_corrupted_counterpart(onto, triplet))
+def corrupted_counterparts(onto: Ontology, triplets: torch.IntTensor) -> List[Triplet]:
+    corrupted_triplets = torch.clone(triplets)
+        
+    for _, triplet in enumerate(corrupted_triplets):
+        _corrupt(onto, triplet)
 
     return corrupted_triplets
 
 
-def _corrupted_counterpart(onto: Ontology, triplet: Triplet) -> None:
+def _corrupt(onto: Ontology, triplet: torch.IntTensor) -> None:
     corrupted_entity_idx = random.randint(0, onto.entities_len() - 1)
-    
+
     # To pick a triplet side toss the coin:
     # ---> Heads
     if random.randint(0, 1) == 0:
-        corrupted_entity = Triplet(head=corrupted_entity_idx, rel=triplet.rel, tail=triplet.tail)
+        triplet[0] = corrupted_entity_idx
     # ---> Tails
     else:
-        corrupted_entity = Triplet(head=triplet.head, rel=triplet.rel, tail=corrupted_entity_idx)
-    
-    return corrupted_entity
+        triplet[2] = corrupted_entity_idx
 
 
 class TripletDataset(torch_data.Dataset):
