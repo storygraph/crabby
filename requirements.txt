@@ -4,3 +4,6 @@ PyNEST===nest-2.20.1
 Topology===nest-2.20.1
 torch==1.12.0+cpu
 typing_extensions==4.2.0
+sklearn-crfsuite==0.3.6
+nltk==3.7
+pandas==1.4.3

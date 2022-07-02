@@ -6,6 +6,9 @@ test-transe:
 test-unit:
 	$(call run_in_venv,-m unittest discover tests/unit/crabby)
 
+.PHONY: setup
+setup:
+	$(call pip install -r requirements.txt)
 
 # 1 - script path
 define run_in_venv
